@@ -16,7 +16,7 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS stephen_king_adaptations_table (
                   imdbRating REAL
                 )''')
 
-# 4. 插入数据
+# 4. 插入或更新数据
 for line in stephen_king_adaptations_list:
     movie_data = line.strip().split(',')
     if len(movie_data) == 4:
@@ -24,14 +24,21 @@ for line in stephen_king_adaptations_list:
         movie_year = movie_data[2]
         imdb_rating = movie_data[3]
         if movie_year.isdigit():  # 检查电影年份是否是数字
-            cursor.execute("INSERT INTO stephen_king_adaptations_table (movieName, movieYear, imdbRating) VALUES (?, ?, ?)",
-                           (movie_name, int(movie_year), float(imdb_rating)))
+            cursor.execute("SELECT * FROM stephen_king_adaptations_table WHERE movieName = ?", (movie_name,))
+            existing_movie = cursor.fetchone()
+            if existing_movie:
+                cursor.execute("UPDATE stephen_king_adaptations_table SET movieYear = ?, imdbRating = ? WHERE movieName = ?",
+                               (int(movie_year), float(imdb_rating), movie_name))
+            else:
+                cursor.execute("INSERT INTO stephen_king_adaptations_table (movieName, movieYear, imdbRating) VALUES (?, ?, ?)",
+                               (movie_name, int(movie_year), float(imdb_rating)))
             conn.commit()
         else:
             print(f"Skipping invalid entry: {movie_name}, {movie_year}, {imdb_rating}")
 
 # 5. 用户交互
 while True:
+    results = []  # 清空查询结果
     print("\nOptions:")
     print("1. Search by movie name")
     print("2. Search by movie year")
@@ -56,6 +63,7 @@ while True:
             cursor.execute("SELECT * FROM stephen_king_adaptations_table WHERE movieYear = ?", (int(movie_year),))
             results = cursor.fetchall()
             if results:
+                print("\nSearch Results:")
                 for result in results:
                     print(f"Movie Name: {result[1]}")
                     print(f"Movie Year: {result[2]}")
@@ -70,15 +78,12 @@ while True:
         if rating_limit.replace(".", "", 1).isdigit():  # 检查输入是否为数字或浮点数
             cursor.execute("SELECT * FROM stephen_king_adaptations_table WHERE imdbRating >= ?", (float(rating_limit),))
             results = cursor.fetchall()
-            printed_movies = set()  # 创建一个集合来跟踪已打印的电影
             if results:
+                print("\nSearch Results:")
                 for result in results:
-                    movie_name = result[1]
-                    if movie_name not in printed_movies:
-                        print(f"Movie Name: {result[1]}")
-                        print(f"Movie Year: {result[2]}")
-                        print(f"IMDB Rating: {result[3]}")
-                        printed_movies.add(movie_name)  # 将电影名称添加到已打印的集合中
+                    print(f"Movie Name: {result[1]}")
+                    print(f"Movie Year: {result[2]}")
+                    print(f"IMDB Rating: {result[3]}")
             else:
                 print("No movies at or above that rating were found in the database")
         else:
@@ -86,6 +91,8 @@ while True:
 
     elif choice == '4':
         break
+
+    results = []  # 清空查询结果
 
 # 关闭数据库连接
 conn.close()
